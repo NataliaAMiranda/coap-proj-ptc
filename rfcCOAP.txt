@@ -1,0 +1,56 @@
+Coap - link https://tools.ietf.org/html/rfc7252#section-3
+##########Modelo de Mensagens###########
+O modelo de mensagens CoAP é baseado na troca de mensagens por UDP entre os endpoints. O CoAP usa um cabeçalho binário de comprimento fixo curto (4 bytes) que pode ser seguido por opções binárias compactas e uma carga útil. 
+Este formato de mensagem é compartilhado por solicitações e respostas. 
+O formato da mensagem CoAP é especificado na Seção 3. 
+Cada mensagem contém um ID de Mensagem usado para detectar duplicatas e para confiabilidade opcional. (O ID de Mensagem é compacto; seu tamanho de 16 bits permite até cerca de 250 mensagens por segundo de um ponto de extremidade para outro com parâmetros de protocolo padrão.) 
+A confiabilidade é fornecida marcando uma mensagem como Confirmada (CON). 
+Uma mensagem de confirmação é retransmitida usando um tempo limite padrão e recuo exponencial entre retransmissões, até que o destinatário envie uma mensagem de confirmação (ACK) com o mesmo ID de mensagem (neste exemplo, 0x7d34) do ponto de extremidade correspondente; veja a Figura 2.
+Quando um destinatário não é capaz de processar uma mensagem de confirmação (ou seja, nem mesmo capaz de fornecer uma resposta de erro adequada), ele responde com uma mensagem de redefinição (RST) em vez de um reconhecimento (ACK).
+Uma mensagem que não requer transmissão confiável (por exemplo, cada medição única de um fluxo de dados do sensor) pode ser enviada como uma mensagem Non-confirmable (NON). Estes não são reconhecidos, mas ainda têm um ID de Mensagem para detecção de duplicados (neste exemplo, 0x01a0); consulte a Figura 3. Quando um destinatário não consegue processar uma mensagem Não confirmável, ele pode responder com uma mensagem Redefinir mensagem (RST), Seção 4, para obter detalhes sobre mensagens CoAP.
+Como o CoAP é executado em UDP, ele também suporta o uso de endereços de destino IP multicast, permitindo solicitações de CoAP multicast. A seção 8 discute o uso adequado de mensagens CoAP com endereços multicast e precauções para evitar o congestionamento de resposta.
+Vários modos de segurança são definidos para o CoAP na Seção 9, desde segurança sem segurança até segurança baseada em certificado. Este documento especifica uma ligação ao DTLS para proteger o protocolo; o uso de IPsec com CoAP é discutido em [IPsec-CoAP].
+
+#######Formato de mensagem#########
+
+O CoAP é baseado na troca de mensagens compactas que, por padrão, são transportadas por UDP 
+(ou seja, cada mensagem CoAP ocupa a seção de dados de um datagrama UDP). 
+As mensagens CoAP são codificadas em um formato binário simples. O formato da mensagem começa com um cabeçalho de 4 bytes de tamanho fixo. 
+Isto é seguido por um valor Token de comprimento variável, que pode ter entre 0 e 8 bytes de comprimento.
+Após o valor Token, vem uma seqüência de zero ou mais opções CoAP no formato Type-Length-Value (TLV), 
+opcionalmente seguido por uma carga útil que ocupa o restante do datagrama.
+    0                   1                   2                   3
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |Ver| T |  TKL  |      Code     |          Message ID           |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |   Token (if any, TKL bytes) ...
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |   Options (if any) ...
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |1 1 1 1 1 1 1 1|    Payload (if any) ...
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Os campos no cabeçalho são definidos da seguinte forma:
+
+   Versão (Ver): inteiro não assinado de 2 bits. Indica o número da versão do CoAP. 
+   Implementações desta especificação DEVEM definir este campo para 1 (01 binário). 
+   Outros valores são reservados para versões futuras. Mensagens com números de versão desconhecidos DEVEM ser silenciosamente ignoradas.
+   
+   Tipo (T): inteiro não assinado de 2 bits. Indica se esta mensagem é do tipo Confirmable (0), Non-confirmable (1), Confirmação (2) ou Reset (3). 
+   A semântica desses tipos de mensagens é definida na Seção 4.
+
+   Comprimento do Token (TKL): inteiro não assinado de 4 bits. Indica o comprimento do campo Token de tamanho variável (0 a 8 bytes). 
+   Comprimentos 9-15 são reservados, não devem ser enviados e devem ser processados ​​como um erro de formato de mensagem.
+
+    Código: inteiro não assinado de 8 bits, dividido em uma classe de 3 bits (bits mais significativos) e um detalhe de 5 bits (bits menos significativos), documentado como "c.dd", em que "c" é um dígito de 0 a 7 para o subcampo de 3 bits e "dd" são dois dígitos de 00 a 31 para o subcampo de 5 bits. A classe pode indicar uma solicitação (0), um sucesso
+resposta (2), uma resposta de erro do cliente (4) ou uma resposta de erro do servidor (5). (Todos os outros valores de classe são reservados.) Como um caso especial, o código 0,00 indica uma mensagem vazia. No caso de uma solicitação, o campo Código indica o método de solicitação; no caso de uma resposta, um código de resposta. Os valores possíveis são mantidos nos Registros de Código CoAP (Seção 12.1). A semântica de solicitações e respostas é definida na Seção 5.
+
+    ID da mensagem: inteiro não assinado de 16 bits na ordem de bytes da rede. Usado para detectar duplicação de mensagens e para corresponder mensagens do tipo Reconhecimento / Redefinir para mensagens do tipo Confirmavel / Não confirmavel. As regras para gerar um ID de Mensagem e mensagens correspondentes são definidas na Seção 4.
+
+#######Formato de opção########
+CoAP define várias opções que podem ser incluídas em uma mensagem. 
+Cada instância de opção em uma mensagem especifica o Número da opção da opção CoAP definida, o comprimento do Valor da Opção e o próprio Valor da Opção. 
+Em vez de especificar o Número de Opções diretamente, as instâncias DEVEM aparecer na ordem de seus Números de Opção e uma codificação delta é usada entre elas: o Número de Opções de cada instância é calculado como a soma de seu delta e o Número de Opções da instância anterior. a mensagem. 
+Para a primeira instância em uma mensagem, uma instância de opção anterior com o Número de Opção zero é assumida. 
+Várias instâncias da mesma opção podem ser incluídas usando um delta de zero.
