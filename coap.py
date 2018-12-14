@@ -119,13 +119,14 @@ class Coap:
 		self.quadro += self.opcoes
 
 	def Get(self, uri, host):
-                    origem = (host, PORTA)
 		self.tipo = TipoMensagem.CON.value
 		self.codigo = Requisicao.GET.value
 		self.tamanho = len(uri)
 		self.opcoes = uri
 		self.delta = Delta.URI_PATH.value
 		self.host = host
+		
+		origem = (host, PORTA)
 		
 		# Montando quadro get
 		IdM = self.GeraIdMsg()
@@ -144,7 +145,6 @@ class Coap:
 		print('Mensagem: ' + (mensagem))
 		
 	def Post(self, uri, host):
-	          origem = (host, PORTA)
 		self.tipo = TipoMensagem.CON.value
 		self.codigo = Requisicao.POST.value
 		self.tamanho = len(uri)
@@ -152,6 +152,8 @@ class Coap:
 		self.delta = Delta.URI_PATH.value
 		self.payload = payload
 		self.host = host
+		
+		origem = (host, PORTA)
 		
 		# Montando quadro get
 		IdM = self.GeraIdMsg()
@@ -170,7 +172,6 @@ class Coap:
 		print('Mensagem: ' + (mensagem))
 		
 	def Put(self, uri, host):
-	          origem = (host, PORTA)
 		self.tipo = TipoMensagem.CON.value
 		self.codigo = Requisicao.PUT.value
 		self.tamanho = len(uri)
@@ -178,6 +179,8 @@ class Coap:
 		self.delta = Delta.URI_PATH.value
 		self.payload = payload
 		self.host = host
+		
+		origem = (host, PORTA)
 		
 		# Montando quadro get
 		IdM = self.GeraIdMsg()
@@ -196,13 +199,14 @@ class Coap:
 		print('Mensagem: ' + (mensagem))
 		
 	def Delete(self, uri, host):
-                    origem = (host, PORTA)
 		self.tipo = TipoMensagem.CON.value
 		self.codigo = Requisicao.DELETE.value
 		self.tamanho = len(uri)
 		self.opcoes = uri
 		self.delta = Delta.URI_PATH.value
 		self.host = host
+		
+		origem = (host, PORTA)
 		
 		# Montando quadro get
 		IdM = self.GeraIdMsg()
