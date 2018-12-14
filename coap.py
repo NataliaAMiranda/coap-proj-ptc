@@ -1,8 +1,10 @@
-import socket	
+import socket
 from enum import Enum
+import os, sys
 
-# parametros de controle para transmissao de mensagens 
+# parametros de controle para transmissao de mensagens
 # sao valores padrao
+
 ACK_TIMEOUT = 2.0
 
 ACK_RANDOM_FACTOR = 1.5
@@ -10,6 +12,8 @@ ACK_RANDOM_FACTOR = 1.5
 MAX_RETRANSMIT = 4
 
 NSTART = 1
+
+PORTA = 5683
 
 
 class TipoMensagem(Enum):
@@ -76,27 +80,142 @@ class Delta(Enum):
 class Coap:
 	def __init__(self):
 		# ver = versao sempre 40
-		# tipo = TipoMensagem 
+		# tipo = TipoMensagem
 		# token = utilizado para controle de requisições e repostas (0 e 8 bytes)
 		# code = separados em 3-bit mais significativos para classes e 5-bits menos significativos para detalhe
-        # payload usada para deduplicação de mensagens e confirmacao ou reset de mensagens.
-        self.ver = b'\x40'
-        self.tipo = b'\x00'
-        self.token = b'\x00'
-        self.code = b'\x00'
-        self.IdMensagem = b'\x00'
-        self.delta = b'\x00'
+                    # payload usada para deduplicação de mensagens e confirmacao ou reset de mensagens.
+                    self.ver = b'\x40'
+                    self.tipo = b'\x00'
+                    self.token = b'\x00'
+                    self.code = b'\x00'
+                    self.IdMensagem = b'\x00'
+                    self.delta = b'\x00'
 		self.tamanho = b'\x00'
-		self.opcoes = b'\x00' 
-		self.payload = b''
+		self.opcoes = b'\x00'
+		self.payload = b'OlaMundo!'
 		self.quadro = b''
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		
+		
+		
+	def GeraIdMsg(self):
+                    idM = os.urandom(2)
+                    return idM
 
-	def GET():
+          def QuadroPayload(self, IdMsg):
+                    self.quadro = b''
+		self.IdMensagem = IdMsg
+		self.quadro = (self.ver[0] | self.tipo[0] | self.token[0]).to_bytes(1, byteorder='big')
+		self.quadro += self.codigo + self.IdMensagem
+		self.quadro += (self.delta[0] << 4 | self.tamanho).to_bytes(1, byteorder='big')
+		self.quadro += self.opcoes + self.payload
+
+          def Quadro(self, IdMsg):
+                    self.quadro = b''
+                    self.IdMensagem = IdMsg
+		self.quadro = (self.ver[0] | self.tipo[0] | self.token[0]).to_bytes(1, byteorder='big')
+		self.quadro += self.codigo + self.IdMensagem
+		self.quadro += (self.delta[0] << 4 | self.tamanho).to_bytes(1, byteorder='big')
+		self.quadro += self.opcoes
+
+	def Get(self, uri, host):
+                    origem = (host, PORTA)
+		self.tipo = TipoMensagem.CON.value
+		self.codigo = Requisicao.GET.value
+		self.tamanho = len(uri)
+		self.opcoes = uri
+		self.delta = Delta.URI_PATH.value
+		self.host = host
 		
-	def POST():
+		# Montando quadro get
+		IdM = self.GeraIdMsg()
+		self.Quadro(IdM)
 		
-	def PUT():
+		print('\n---------------------------\n')
+		print('Quadro: ' + (self.quadro))
+		print('\n---------------------------\n')
 		
-	def DELETE():
+		# Envia socket
+		self.sock.sendto(self.quadro, origem)
 		
+		# Aguarda resposta
+		mensagem , endereco = self.sock.recvfrom(1024)
+		print('IP: ' + (endereco))
+		print('Mensagem: ' + (mensagem))
+		
+	def Post(self, uri, host):
+	          origem = (host, PORTA)
+		self.tipo = TipoMensagem.CON.value
+		self.codigo = Requisicao.POST.value
+		self.tamanho = len(uri)
+		self.opcoes = uri
+		self.delta = Delta.URI_PATH.value
+		self.payload = payload
+		self.host = host
+		
+		# Montando quadro get
+		IdM = self.GeraIdMsg()
+		self.QuadroPayload(IdM)
+		
+		print('\n---------------------------\n')
+		print('Quadro: ' + (self.quadro))
+		print('\n---------------------------\n')
+		
+		# Envia socket
+		self.sock.sendto(self.quadro, origem)
+		
+		# Aguarda resposta
+		mensagem , endereco = self.sock.recvfrom(1024)
+		print('IP: ' + (endereco))
+		print('Mensagem: ' + (mensagem))
+		
+	def Put(self, uri, host):
+	          origem = (host, PORTA)
+		self.tipo = TipoMensagem.CON.value
+		self.codigo = Requisicao.PUT.value
+		self.tamanho = len(uri)
+		self.opcoes = uri
+		self.delta = Delta.URI_PATH.value
+		self.payload = payload
+		self.host = host
+		
+		# Montando quadro get
+		IdM = self.GeraIdMsg()
+		self.QuadroPayload(IdM)
+		
+		print('\n---------------------------\n')
+		print('Quadro: ' + (self.quadro))
+		print('\n---------------------------\n')
+		
+		# Envia socket
+		self.sock.sendto(self.quadro, origem)
+		
+		# Aguarda resposta
+		mensagem , endereco = self.sock.recvfrom(1024)
+		print('IP: ' + (endereco))
+		print('Mensagem: ' + (mensagem))
+		
+	def Delete(self, uri, host):
+                    origem = (host, PORTA)
+		self.tipo = TipoMensagem.CON.value
+		self.codigo = Requisicao.DELETE.value
+		self.tamanho = len(uri)
+		self.opcoes = uri
+		self.delta = Delta.URI_PATH.value
+		self.host = host
+		
+		# Montando quadro get
+		IdM = self.GeraIdMsg()
+		self.Quadro(IdM)
+		
+		print('\n---------------------------\n')
+		print('Quadro: ' + (self.quadro))
+		print('\n---------------------------\n')
+		
+		# Envia socket
+		self.sock.sendto(self.quadro, origem)
+		
+		# Aguarda resposta
+		mensagem , endereco = self.sock.recvfrom(1024)
+		print('IP: ' + (endereco))
+		print('Mensagem: ' + (mensagem))
