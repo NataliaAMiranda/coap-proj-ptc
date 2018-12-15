@@ -1,5 +1,6 @@
 import coap
-
+import os
+import sys
 
 #.well-known/core
 
@@ -10,5 +11,6 @@ print('Informa o Ip')
 ip = input()
 
 clienteCoap = coap.Coap()
-
-clienteCoap.Get(uri,ip)
+uri_bytes = uri
+clienteCoap.Get(uri_bytes,ip)
+#clienteCoap.Post(uri_bytes,ip)
