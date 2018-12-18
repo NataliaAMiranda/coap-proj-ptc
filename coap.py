@@ -74,8 +74,6 @@ class Delta(Enum):
     PROXY_SCHEME =  b'\x27'
     SIZE1 = B'\x3C'
 
-
-
 class Coap:
 	def __init__(self):
 	    self.ver = b'\x40'
@@ -89,7 +87,8 @@ class Coap:
 	    self.payload = b'OlaMundo!'
 	    self.quadro = b''
 	    self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	
+	    
+	    
 	def GeraIdMsg(self):
 	    idM = os.urandom(2)
 	    return idM
@@ -106,59 +105,91 @@ class Coap:
 	    self.quadro = (self.ver[0] | self.tipo[0] | self.token[0]).to_bytes(1, byteorder='big')
 	    self.quadro += self.codigo + self.IdMensagem
 	    
-	    
+	def recpcao(self, quadro_recebido):
+	    octave = quadro_recebido[0] 
+	    quadro = quadro_recebido[1:]
+	    ## Mascara para separar os bits
+	    Ver = octave &192 # Versao do COAP - 11000000
+	    T = octave & 48 # Tipo da mensagem - 00110000
+	    TKL = octave & 15 # Tamanho Token - 00001111
 
-	def Get(self, uri, host):
-		self.quadro = b''
-		self.host = host
-		self.tipo = TipoMensagem.CON.value
-		self.codigo = Requisicao.GET.value
-		
-		origem = (host, PORTA)
-		
-		
-		#Monta quadro
-		self.Quadro()
-		
-		listaUri = uri.split('/')
-		for uri in  listaUri:
-			self.delta = Delta.URI_PATH.value[0] - self.delta
-			self.tamanho = 	len(uri)
-			self.opcoes = str.encode(uri)
-			self.quadro += (self.delta << 4 | self.tamanho).to_bytes(1, byteorder='big')
-			self.quadro += self.opcoes
-		    
-		print('\n---------------------------\n')
-		print('Quadro: ' + str(self.quadro))
-		print('\n---------------------------\n')
-		
-		# Envia socket
-		self.sock.sendto(self.quadro, origem)
-		
-		# Aguarda resposta
-		mensagem , endereco = self.sock.recvfrom(1024)
-		print('Mensagem: ' + str(mensagem))
-		    
-	def Post(self, uri, host):
-	    self.tipo = TipoMensagem.CON.value
-	    self.codigo = Requisicao.POST.value
-	    self.payload = self.payload
+	    if(T != 32): # ACK - 00100000
+		    return (-1, None, None)
+	    code = quadro_recebido[0]
+	    quadro = quadro_recebido[1:]
+	    
+	    if (code >= 128 and code < 192):
+		    return (1, code, None)
+	    
+	    if (code >= 64 and code <96):
+		    MID = quadro_recebido[0:2]
+		    quadro =quadro_recebido[2:]
+		    if(MID != self.IdMensagem):
+			    return (-2, None,None)
+			    
+		    quadro = quadro_recebido[TKL:]
+		    valor = True
+		    while valor:
+			    opcao = quadro_recebido[0]
+			    quadro = quadro_recebido[1:]
+			    
+			    op_delta = opcao & 240
+			    op_length = opcao & 15
+			    op_delta = op_delta >> 4
+
+			    if (op_delta == 13):
+				    op_delta = quadro_recebido[0]
+				    quadro = quadro_recebido[1:]
+			    if (op_delta == 14):
+				    op_delta = quadro_recebido[0:2]
+				    quadro = quadro_recebido[2:]
+			    if (op_delta == 15):
+				    if (op_length != 15):
+					    return (-3, None, None)
+				    else:
+					    valor = False
+				    payload = quadro
+
+			    if (op_delta < 13):		
+				    if (op_length == 13):
+					    op_length = quadro_recebido[0]
+					    quadro = quadro_recebido[1:]
+				    if (op_length == 14):
+					    op_length = quadro_recebido[0:2]
+					    quadro = quadro_recebido[2:]
+				    if (op_length == 15):
+					    return (-3, None, None)
+				    opcao2 = quadro_recebido[0:op_length]
+		    return (1, codigo, payload)
+
+	def Get(self, uri, host,op):
+	    self.quadro = b''
 	    self.host = host
+	    self.tipo = TipoMensagem.CON.value
+	    self.codigo = Requisicao.GET.value
+	    self.op = op
 	    
 	    origem = (host, PORTA)
 	    
-	    # Montando quadro
-	    
-	    self.QuadroPayload()
+	    #Monta quadro
+	    self.Quadro()
 	    
 	    listaUri = uri.split('/')
-		for uri in  listaUri:
-			self.delta = Delta.URI_PATH.value[0] - self.delta
-			self.tamanho = 	len(uri)
-			self.opcoes = str.encode(uri)
-			self.quadro += (self.delta << 4 | self.tamanho).to_bytes(1, byteorder='big')
-			self.quadro += self.opcoes + self.payload
-	 
+	    for uri in  listaUri:
+		    if int(self.op) == 11:
+			    self.delta = Delta.URI_PATH.value[0] - self.delta
+			    self.tamanho = len(uri)
+			    self.opcoes = str.encode(uri)
+			    self.quadro += (self.delta << 4 | self.tamanho).to_bytes(1, byteorder='big')
+			    self.quadro += self.opcoes
+		    elif int(self.op) == 3:
+			    self.delta = Delta.URI_HOST.value[0] - self.delta
+			    self.tamanho = len(uri)
+			    self.opcoes = str.encode(uri)
+			    self.quadro += (self.delta << 4 | self.tamanho).to_bytes(1, byteorder='big')
+			    self.quadro += self.opcoes
+		    else:
+			    print('ERRO - Opção não encontrada')
 	    
 	    print('\n---------------------------\n')
 	    print('Quadro: ' + str(self.quadro))
@@ -170,6 +201,47 @@ class Coap:
 	    # Aguarda resposta
 	    mensagem , endereco = self.sock.recvfrom(1024)
 	    print('Mensagem: ' + str(mensagem))
+	    
+	    resposta = self.recpcao(mensagem)
+	    #print('Resposta' + str(resposta[2]))
+	    
+	def Post(self, uri, host):
+		self.tipo = TipoMensagem.CON.value
+		self.codigo = Requisicao.POST.value
+		self.payload = self.payload
+		self.host = host
+		
+		origem = (host, PORTA)
+		
+		# Montando quadro
+	    
+		self.QuadroPayload()
+		for uri in  listaUri:
+		    if int(self.op) == 11:
+			    self.delta = Delta.URI_PATH.value[0] - self.delta
+			    self.tamanho = len(uri)
+			    self.opcoes = str.encode(uri)
+			    self.quadro += (self.delta << 4 | self.tamanho).to_bytes(1, byteorder='big')
+			    self.quadro += self.opcoes
+		    elif int(self.op) == 3:
+			    self.delta = Delta.URI_HOST.value[0] - self.delta
+			    self.tamanho = len(uri)
+			    self.opcoes = str.encode(uri)
+			    self.quadro += (self.delta << 4 | self.tamanho).to_bytes(1, byteorder='big')
+			    self.quadro += self.opcoes
+		    else:
+			    print('ERRO - Opção não encontrada')
+	    
+		print('\n---------------------------\n')
+		print('Quadro: ' + str(self.quadro))
+		print('\n---------------------------\n')
+		
+		# Envia socket
+		self.sock.sendto(self.quadro, origem)
+		
+		# Aguarda resposta
+		mensagem , endereco = self.sock.recvfrom(1024)
+		print('Mensagem: ' + str(mensagem))
 		
 	def Put(self, uri, host):
 	    self.tipo = TipoMensagem.CON.value
@@ -187,14 +259,22 @@ class Coap:
 	    self.QuadroPayload()
 	    
 	    listaUri = uri.split('/')
-		for uri in  listaUri:
-			self.delta = Delta.URI_PATH.value[0] - self.delta
-			self.tamanho = 	len(uri)
-			self.opcoes = str.encode(uri)
-			self.quadro += (self.delta << 4 | self.tamanho).to_bytes(1, byteorder='big')
-			self.quadro += self.opcoes + self.playload
-	    
-	    
+	    for uri in  listaUri:
+		    if int(self.op) == 11:
+			    self.delta = Delta.URI_PATH.value[0] - self.delta
+			    self.tamanho = len(uri)
+			    self.opcoes = str.encode(uri)
+			    self.quadro += (self.delta << 4 | self.tamanho).to_bytes(1, byteorder='big')
+			    self.quadro += self.opcoes
+		    elif int(self.op) == 3:
+			    self.delta = Delta.URI_HOST.value[0] - self.delta
+			    self.tamanho = len(uri)
+			    self.opcoes = str.encode(uri)
+			    self.quadro += (self.delta << 4 | self.tamanho).to_bytes(1, byteorder='big')
+			    self.quadro += self.opcoes
+		    else:
+			    print('ERRO - Opção não encontrada')
+
 	    print('\n---------------------------\n')
 	    print('Quadro: ' + str(self.quadro))
 	    print('\n---------------------------\n')
@@ -205,7 +285,7 @@ class Coap:
 	    # Aguarda resposta
 	    mensagem , endereco = self.sock.recvfrom(1024)
 	    print('Mensagem: ' + str(mensagem))
-		
+
 	def Delete(self, uri, host):
 	    self.tipo = TipoMensagem.CON.value
 	    self.codigo = Requisicao.DELETE.value
@@ -221,11 +301,20 @@ class Coap:
 	    
 	    listaUri = uri.split('/')
 	    for uri in  listaUri:
-		    self.delta = Delta.URI_PATH.value[0] - self.delta
-		    self.tamanho = len(uri)
-		    self.opcoes = str.encode(uri)
-		    self.quadro += (self.delta << 4 | self.tamanho).to_bytes(1, byteorder='big')
-		    self.quadro += self.opcoes
+		    if int(self.op) == 11:
+			    self.delta = Delta.URI_PATH.value[0] - self.delta
+			    self.tamanho = len(uri)
+			    self.opcoes = str.encode(uri)
+			    self.quadro += (self.delta << 4 | self.tamanho).to_bytes(1, byteorder='big')
+			    self.quadro += self.opcoes
+		    elif int(self.op) == 3:
+			    self.delta = Delta.URI_HOST.value[0] - self.delta
+			    self.tamanho = len(uri)
+			    self.opcoes = str.encode(uri)
+			    self.quadro += (self.delta << 4 | self.tamanho).to_bytes(1, byteorder='big')
+			    self.quadro += self.opcoes
+		    else:
+			    print('ERRO - Opção não encontrada')
 	    
 	    print('\n---------------------------\n')
 	    print('Quadro: ' + str(self.quadro))
